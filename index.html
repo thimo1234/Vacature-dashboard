@@ -1,17 +1,15 @@
-export const config = { runtime: 'edge' };
-
 const FEEDS = [
   {
     name: 'Indeed',
-    url: 'https://nl.indeed.com/rss?q=systeembeheerder+OR+%22cloud+engineer%22+OR+%22devops+engineer%22+OR+%22system+engineer%22+OR+%22applicatiebeheerder%22+OR+%22werkplekbeheerder%22+OR+%22IT+manager%22&l=Amsterdam&jt=fulltime&radius=25'
+    url: 'https://nl.indeed.com/rss?q=systeembeheerder+OR+%22cloud+engineer%22+OR+%22devops+engineer%22+OR+%22system+engineer%22+OR+%22applicatiebeheerder%22&l=Amsterdam&jt=fulltime&radius=25'
   },
   {
     name: 'Nationale Vacaturebank',
-    url: 'https://www.nationalevacaturebank.nl/vacature/rss?keywords=systeembeheerder+OR+cloud+engineer+OR+devops+OR+applicatiebeheerder+OR+werkplekbeheerder&location=Amsterdam&employmentType=fulltime'
+    url: 'https://www.nationalevacaturebank.nl/vacature/rss?keywords=systeembeheerder+cloud+devops+applicatiebeheerder&location=Amsterdam&employmentType=fulltime'
   },
   {
     name: 'ITjobs.nl',
-    url: 'https://www.itjobs.nl/rss/vacatures?zoekterm=systeembeheerder+OR+cloud+engineer+OR+devops+engineer&regio=amsterdam&dienstverband=vast'
+    url: 'https://www.itjobs.nl/rss/vacatures?zoekterm=systeembeheerder+cloud+devops&regio=amsterdam&dienstverband=vast'
   },
   {
     name: 'Jobbird',
@@ -19,24 +17,18 @@ const FEEDS = [
   }
 ];
 
-const FREELANCE_KW = ['freelance','zzp','interim','opdracht','zelfstandig','contractor','zp '];
+const FREELANCE_KW = ['freelance','zzp','interim','opdracht','zelfstandig','contractor'];
 
 function parseXML(text) {
   const items = [];
-  const itemMatches = text.matchAll(/<item>([\s\S]*?)<\/item>/g);
-  for (const match of itemMatches) {
-    const block = match[1];
+  const matches = text.matchAll(/<item>([\s\S]*?)<\/item>/g);
+  for (const m of matches) {
+    const block = m[1];
     const get = (tag) => {
-      const m = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-      return m ? (m[1] || m[2] || '').trim() : '';
+      const r = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+      return r ? (r[1] || r[2] || '').trim() : '';
     };
-    items.push({
-      title: get('title'),
-      link: get('link'),
-      description: get('description'),
-      pubDate: get('pubDate'),
-      company: get('source') || get('author') || ''
-    });
+    items.push({ title: get('title'), link: get('link'), pubDate: get('pubDate'), description: get('description'), company: get('source') || get('author') || '' });
   }
   return items;
 }
@@ -49,61 +41,38 @@ function daysBack(pubDate) {
 }
 
 function isFreelance(title, desc) {
-  const text = (title + ' ' + desc).toLowerCase();
-  return FREELANCE_KW.some(k => text.includes(k));
+  const t = (title + ' ' + desc).toLowerCase();
+  return FREELANCE_KW.some(k => t.includes(k));
 }
 
-export default async function handler(req) {
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
+
   const results = await Promise.allSettled(
     FEEDS.map(async (feed) => {
-      const res = await fetch(feed.url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; VacatureDashboard/1.0)',
-          'Accept': 'application/rss+xml, application/xml, text/xml'
-        },
-        signal: AbortSignal.timeout(8000)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      const items = parseXML(text);
-      return {
-        source: feed.name,
-        count: items.length,
-        items: items
-          .filter(i => i.title && !isFreelance(i.title, i.description))
-          .map(i => ({
-            title: i.title,
-            link: i.link,
-            source: feed.name,
-            company: i.company,
-            description: i.description.replace(/<[^>]+>/g, '').slice(0, 200),
-            daysBack: daysBack(i.pubDate),
-            pubDate: i.pubDate
-          }))
-      };
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
+        const r = await fetch(feed.url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VacatureDashboard/1.0)', 'Accept': 'application/rss+xml, text/xml' },
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const text = await r.text();
+        const items = parseXML(text).filter(i => i.title && !isFreelance(i.title, i.description));
+        return { name: feed.name, ok: true, items: items.map(i => ({ title: i.title, link: i.link, source: feed.name, company: i.company, description: i.description.replace(/<[^>]+>/g, '').slice(0, 200), daysBack: daysBack(i.pubDate), pubDate: i.pubDate })) };
+      } catch(e) {
+        clearTimeout(timeout);
+        return { name: feed.name, ok: false, error: e.message, items: [] };
+      }
     })
   );
 
-  const feeds = results.map((r, i) => ({
-    name: FEEDS[i].name,
-    ok: r.status === 'fulfilled',
-    error: r.status === 'rejected' ? r.reason?.message : null,
-    items: r.status === 'fulfilled' ? r.value.items : []
-  }));
+  const feeds = results.map(r => r.status === 'fulfilled' ? r.value : { name: '?', ok: false, items: [] });
+  const allItems = feeds.flatMap(f => f.items).sort((a, b) => a.daysBack - b.daysBack);
 
-  const allItems = feeds.flatMap(f => f.items);
-
-  return new Response(JSON.stringify({
-    ok: true,
-    fetched_at: new Date().toISOString(),
-    total: allItems.length,
-    sources: feeds.map(f => ({ name: f.name, ok: f.ok, count: f.items.length, error: f.error })),
-    items: allItems.sort((a, b) => a.daysBack - b.daysBack)
-  }), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 's-maxage=900, stale-while-revalidate=1800'
-    }
-  });
-}
+  res.json({ ok: true, fetched_at: new Date().toISOString(), total: allItems.length, sources: feeds.map(f => ({ name: f.name, ok: f.ok, count: f.items.length, error: f.error || null })), items: allItems });
+};
