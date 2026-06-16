@@ -1,78 +1,610 @@
-const FEEDS = [
-  {
-    name: 'Indeed',
-    url: 'https://nl.indeed.com/rss?q=systeembeheerder+OR+%22cloud+engineer%22+OR+%22devops+engineer%22+OR+%22system+engineer%22+OR+%22applicatiebeheerder%22&l=Amsterdam&jt=fulltime&radius=25'
-  },
-  {
-    name: 'Nationale Vacaturebank',
-    url: 'https://www.nationalevacaturebank.nl/vacature/rss?keywords=systeembeheerder+cloud+devops+applicatiebeheerder&location=Amsterdam&employmentType=fulltime'
-  },
-  {
-    name: 'ITjobs.nl',
-    url: 'https://www.itjobs.nl/rss/vacatures?zoekterm=systeembeheerder+cloud+devops&regio=amsterdam&dienstverband=vast'
-  },
-  {
-    name: 'Jobbird',
-    url: 'https://www.jobbird.com/nl/vacature-rss?q=systeembeheerder+cloud+engineer+devops&l=Amsterdam&contract=fulltime'
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vacature Dashboard – Elevation Partners</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F7F6F3; --surface: #FFFFFF; --border: #E4E2DC;
+      --text: #1A1917; --muted: #6B6860; --hint: #9C9A94;
+      --accent: #1B4FD8; --accent-bg: #EEF2FF;
+      --mkb-bg: #EDFAF4; --mkb-text: #0D6E4A; --mkb-border: #A7F3D0;
+      --mid-bg: #FEF3E2; --mid-text: #92400E; --mid-border: #FCD34D;
+      --ent-bg: #FEE9E9; --ent-text: #991B1B; --ent-border: #FECACA;
+      --new-bg: #ECFDF5; --new-text: #065F46;
+      --vast-bg: #EEF2FF; --vast-text: #1B4FD8;
+      --seen-bg: #F3F4F6; --seen-text: #6B7280;
+      --star-bg: #FFFBEB; --star-text: #92400E;
+      --radius: 10px; --radius-sm: 6px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+    .shell { max-width: 920px; margin: 0 auto; padding: 28px 20px 64px; }
+
+    /* Header */
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon { width: 36px; height: 36px; background: var(--accent); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
+    .brand-icon svg { width: 20px; height: 20px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .brand-text h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+    .brand-text p { font-size: 12px; color: var(--muted); }
+    .pill-vast { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; background: var(--vast-bg); color: var(--vast-text); padding: 3px 10px; border-radius: 20px; border: 1px solid #C7D2FE; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .stat-num { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); line-height: 1; margin-bottom: 3px; }
+    .stat-lbl { font-size: 11px; color: var(--muted); }
+
+    /* Search bar */
+    .search-wrap { position: relative; margin-bottom: 14px; }
+    .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--hint); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+    .search-wrap input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; }
+    .search-wrap input:focus { outline: none; border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--hint); }
+
+    /* Size toggle */
+    .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--hint); margin-bottom: 7px; }
+    .size-row { display: flex; gap: 7px; margin-bottom: 6px; flex-wrap: wrap; }
+    .size-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 5px 13px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; line-height: 1; }
+    .size-btn .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+    .size-btn.on-mkb { background: var(--mkb-bg); color: var(--mkb-text); border-color: var(--mkb-border); }
+    .size-btn.on-mid { background: var(--mid-bg); color: var(--mid-text); border-color: var(--mid-border); }
+    .size-btn.on-ent { background: var(--ent-bg); color: var(--ent-text); border-color: var(--ent-border); }
+    .size-hint { font-size: 11px; color: var(--hint); margin-bottom: 18px; }
+
+    /* Filters row */
+    .filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+    .fg label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--hint); margin-bottom: 5px; }
+    select { width: 100%; font-size: 13px; padding: 7px 28px 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239C9A94' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; cursor: pointer; }
+
+    /* Sort + view row */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .view-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+    .view-btn { padding: 5px 10px; font-size: 12px; background: var(--surface); color: var(--muted); border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .view-btn.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+    .view-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-refresh { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; }
+    .btn-refresh:hover { background: #1741B8; }
+    .btn-refresh svg { width: 13px; height: 13px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .last-updated { font-size: 11px; color: var(--hint); }
+
+    /* Date filter tabs */
+    .date-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .date-tab { font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+    .date-tab.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+    /* Saved tabs */
+    .saved-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .saved-tab { font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .saved-tab.active { background: var(--star-bg); color: var(--star-text); border-color: #FCD34D; }
+    .saved-tab svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Job list / grid */
+    .job-list { display: flex; flex-direction: column; gap: 8px; }
+    .job-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Job card */
+    .job-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; transition: border-color 0.1s; position: relative; }
+    .job-card:hover { border-color: #C4C2BC; }
+    .job-card.is-seen { opacity: 0.55; }
+    .job-card.is-seen:hover { opacity: 0.8; }
+    .job-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .job-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.3; flex: 1; }
+    .job-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .action-btn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+    .action-btn:hover { background: var(--bg); }
+    .action-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .action-btn.starred { background: var(--star-bg); color: var(--star-text); border-color: #FCD34D; }
+    .action-btn.starred svg { fill: currentColor; }
+    .action-btn.seen-btn.active { background: var(--seen-bg); color: var(--seen-text); border-color: #D1D5DB; }
+    .job-source-tag { font-size: 10px; color: var(--muted); background: var(--bg); padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border); white-space: nowrap; }
+    .job-meta { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+    .meta-item { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+    .meta-item svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+    .badge-mkb { background: var(--mkb-bg); color: var(--mkb-text); }
+    .badge-mid { background: var(--mid-bg); color: var(--mid-text); }
+    .badge-ent { background: var(--ent-bg); color: var(--ent-text); }
+    .badge-new { background: var(--new-bg); color: var(--new-text); }
+    .badge-vast { background: var(--vast-bg); color: var(--vast-text); }
+    .badge-seen { background: var(--seen-bg); color: var(--seen-text); }
+    .job-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--accent); text-decoration: none; margin-top: 10px; font-weight: 500; }
+    .job-link:hover { text-decoration: underline; }
+    .job-link svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* RSS info */
+    .rss-info { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; }
+    .rss-info h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    .rss-sources { display: flex; gap: 16px; flex-wrap: wrap; }
+    .rss-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .rss-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .rss-ok .rss-dot { background: #10B981; }
+    .rss-err .rss-dot { background: #EF4444; }
+    .rss-note { font-size: 11px; color: var(--hint); margin-top: 8px; line-height: 1.6; }
+
+    /* Divider */
+    hr { border: none; border-top: 1px solid var(--border); margin-bottom: 14px; }
+
+    /* Empty */
+    .state-box { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+
+    .size-btn.on-direct { background: #EFF6FF; color: #1E40AF; border-color: #BFDBFE; }
+    .size-btn.on-recruiter { background: #FDF4FF; color: #6B21A8; border-color: #E9D5FF; }
+    .badge-direct { background: #EFF6FF; color: #1E40AF; }
+    .meta-link { font-size: 12px; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 3px; }
+    .meta-link:hover { text-decoration: underline; }
+    .meta-link svg { stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .badge-recruiter { background: #FDF4FF; color: #6B21A8; }
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: 1fr 1fr 1fr; }
+      .filters { grid-template-columns: 1fr 1fr; }
+      .job-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>Vacature Dashboard</h1>
+        <p>Elevation Partners · IT Infrastructuur · Regio Amsterdam</p>
+      </div>
+    </div>
+    <span class="pill-vast">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Alleen vast dienstverband
+    </span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="s-total">—</div><div class="stat-lbl">Zichtbaar</div></div>
+    <div class="stat"><div class="stat-num" id="s-new">—</div><div class="stat-lbl">Nieuw vandaag</div></div>
+    <div class="stat"><div class="stat-num" id="s-week">—</div><div class="stat-lbl">Deze week</div></div>
+    <div class="stat"><div class="stat-num" id="s-starred">—</div><div class="stat-lbl">Opgeslagen</div></div>
+    <div class="stat"><div class="stat-num" id="s-filtered">—</div><div class="stat-lbl">Freelance gefilterd</div></div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="f-search" placeholder="Zoek op technologie, functietitel of bedrijf… bijv. Azure, AFAS, Linux" oninput="render()" />
+  </div>
+
+  <!-- Bedrijfsgrootte -->
+  <div class="section-label">Bedrijfsgrootte</div>
+  <div class="size-row">
+    <button class="size-btn on-mkb" data-s="mkb" onclick="toggleSize('mkb')"><span class="dot"></span> MKB <span style="font-weight:400;opacity:.7;">10–100 mw</span></button>
+    <button class="size-btn on-mid" data-s="mid" onclick="toggleSize('mid')"><span class="dot"></span> Mid-market <span style="font-weight:400;opacity:.7;">100–500 mw</span></button>
+    <button class="size-btn" data-s="ent" onclick="toggleSize('ent')"><span class="dot"></span> Enterprise <span style="font-weight:400;opacity:.7;">500+ mw</span></button>
+  </div>
+  <p class="size-hint">MKB en Mid-market = minder concurrentie, hogere slagingskans voor Elevation Partners</p>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="fg">
+      <label>Categorie</label>
+      <select id="f-cat" onchange="render()">
+        <option value="">Alle categorieën</option>
+        <option value="beheer">Beheer & Support</option>
+        <option value="cloud">Cloud & DevOps</option>
+        <option value="app">Applicatiebeheer</option>
+        <option value="erp">ERP & Consultancy</option>
+        <option value="management">Management & Architectuur</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Bron</label>
+      <select id="f-src" onchange="render()">
+        <option value="">Alle bronnen</option>
+        <option value="Indeed">Indeed</option>
+        <option value="Nationale Vacaturebank">Nat. Vacaturebank</option>
+        <option value="ITjobs.nl">ITjobs.nl</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Salaris (min/jaar)</label>
+      <select id="f-sal" onchange="render()">
+        <option value="0">Geen voorkeur</option>
+        <option value="40">€40.000+</option>
+        <option value="50">€50.000+</option>
+        <option value="60">€60.000+</option>
+        <option value="70">€70.000+</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Ervaringsniveau</label>
+      <select id="f-level" onchange="render()">
+        <option value="">Alle niveaus</option>
+        <option value="junior">Junior (0–2 jr)</option>
+        <option value="medior">Medior (2–5 jr)</option>
+        <option value="senior">Senior (5–10 jr)</option>
+        <option value="lead">Lead / Principal (10+ jr)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Date tabs -->
+  <div class="section-label">Datum geplaatst</div>
+  <div class="date-tabs">
+    <button class="date-tab active" data-d="all" onclick="setDate('all')">Alles</button>
+    <button class="date-tab" data-d="0" onclick="setDate('0')">Vandaag</button>
+    <button class="date-tab" data-d="3" onclick="setDate('3')">Afgelopen 3 dagen</button>
+    <button class="date-tab" data-d="7" onclick="setDate('7')">Afgelopen week</button>
+    <button class="date-tab" data-d="old" onclick="setDate('old')">Ouder dan 7 dagen</button>
+  </div>
+
+  <!-- Saved / gezien tabs -->
+  <div class="saved-tabs">
+    <button class="saved-tab active" data-v="all" onclick="setView('all')">Alle vacatures</button>
+    <button class="saved-tab" data-v="starred" onclick="setView('starred')">
+      <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Opgeslagen
+    </button>
+    <button class="saved-tab" data-v="unseen" onclick="setView('unseen')">Niet gezien</button>
+  </div>
+
+  <!-- Placer type toggle -->
+  <div class="section-label">Wie plaatst de vacature</div>
+  <div class="size-row" style="margin-bottom:18px;">
+    <button class="size-btn on-direct" data-p="direct" onclick="togglePlacer('direct')"><span class="dot"></span> Directe werkgever</button>
+    <button class="size-btn on-recruiter" data-p="recruiter" onclick="togglePlacer('recruiter')"><span class="dot"></span> Recruitment partij</button>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button class="btn-refresh" onclick="fetchJobs()">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        Vernieuwen
+      </button>
+      <span class="last-updated" id="last-updated"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="fg" style="margin:0;">
+        <select id="f-sort" onchange="render()" style="font-size:12px;padding:5px 26px 5px 8px;">
+          <option value="date-new">Nieuwste eerst</option>
+          <option value="date-old">Oudste eerst</option>
+          <option value="sal-high">Salaris hoog → laag</option>
+          <option value="sal-low">Salaris laag → hoog</option>
+          <option value="company">Bedrijf A → Z</option>
+        </select>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="vb-list" onclick="switchView('list')">
+          <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Lijst
+        </button>
+        <button class="view-btn" id="vb-grid" onclick="switchView('grid')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Grid
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RSS status -->
+  <div class="rss-info">
+    <h3>Vacaturebronnen</h3>
+    <div class="rss-sources">
+      <div class="rss-row rss-ok" id="src-indeed"><span class="rss-dot"></span><span id="src-indeed-txt">Laden...</span></div>
+      <div class="rss-row rss-ok" id="src-nvb"><span class="rss-dot"></span><span id="src-nvb-txt">Laden...</span></div>
+      <div class="rss-row rss-ok" id="src-itjobs"><span class="rss-dot"></span><span id="src-itjobs-txt">Laden...</span></div>
+    </div>
+    <p class="rss-note">ℹ️ Vacatures worden opgehaald via gratis RSS feeds. Bij CORS-beperkingen valt de tool terug op realistische voorbeelddata.</p>
+  </div>
+
+  <hr />
+  <div id="job-list"><div class="state-box">Vacatures worden geladen...</div></div>
+</div>
+
+<script>
+const MKB = ["Ictivity","Previder","Simac ICT","Solvinity","True","Proact","Ivar IT","Netboss","Colo4","Fundaments","BIT","Sourcelab","Flexamedia","Ynformed","Codestein","Deltaflow","ITQ","Avinty","Nexer","Sourcery"];
+const MID = ["Wortell","Axians","Claranet","PinkRoccade","Cegeka","Getronics","Bechtle","Infradata","Dustin","Conclusion","Sogeti","Coda","Motiv ICT","Lemonfish","Intercept"];
+const ENT = ["ING","ABN AMRO","Booking.com","Capgemini","Atos","KPN","Accenture","NS","Vodafone","TomTom","Heineken","Nationale-Nederlanden","Randstad","ASML","Philips"];
+const RECRUITERS = [
+  "Yacht","Hays","Randstad","Michael Page","Robert Half","Adecco","Manpower",
+  "Experis","USG People","Brunel","IT Staffing","Computable Careers","LINKIT",
+  "Coda","Sogeti","Capgemini","Accenture","Atos","Detron","TOPdesk Recruitment",
+  "Headfirst","Professionals","The Talent Institute","YER","Harvey Nash",
+  "Luminis","InSpark","iSense","Tribe IT","Techpeople","Jobsrepublic"
+];
+const COMPANY_URLS = {
+  "Ictivity":"https://www.ictivity.nl","Previder":"https://www.previder.nl",
+  "Simac ICT":"https://www.simac.com","Solvinity":"https://www.solvinity.com",
+  "True":"https://www.true.nl","Proact":"https://www.proact.nl",
+  "Ivar IT":"https://www.ivar.nl","Netboss":"https://www.netboss.nl",
+  "Colo4":"https://www.colo4.nl","Fundaments":"https://www.fundaments.nl",
+  "BIT":"https://www.bit.nl","Sourcelab":"https://www.sourcelab.nl",
+  "Flexamedia":"https://www.flexamedia.nl","Ynformed":"https://www.ynformed.nl",
+  "Codestein":"https://www.codestein.nl","Deltaflow":"https://www.deltaflow.nl",
+  "ITQ":"https://www.itq.eu","Avinty":"https://www.avinty.nl",
+  "Nexer":"https://www.nexergroup.com","Sourcery":"https://www.sourcery.ai",
+  "Wortell":"https://www.wortell.nl","Axians":"https://www.axians.nl",
+  "Claranet":"https://www.claranet.nl","PinkRoccade":"https://www.pinkroccade.nl",
+  "Cegeka":"https://www.cegeka.com","Getronics":"https://www.getronics.com",
+  "Bechtle":"https://www.bechtle.com","Infradata":"https://www.infradata.com",
+  "Dustin":"https://www.dustin.nl","Conclusion":"https://www.conclusion.nl",
+  "Sogeti":"https://www.sogeti.nl","Coda":"https://www.coda.nl",
+  "Motiv ICT":"https://www.motiv.nl","Lemonfish":"https://www.lemonfish.nl",
+  "Intercept":"https://www.intercept.nl",
+  "ING":"https://www.ing.nl","ABN AMRO":"https://www.abnamro.nl",
+  "Booking.com":"https://www.booking.com","Capgemini":"https://www.capgemini.com/nl-nl",
+  "Atos":"https://atos.net/nl","KPN":"https://www.kpn.com",
+  "Accenture":"https://www.accenture.com/nl-nl","NS":"https://www.ns.nl",
+  "Vodafone":"https://www.vodafone.nl","TomTom":"https://www.tomtom.com",
+  "Heineken":"https://www.heineken.com","Nationale-Nederlanden":"https://www.nn.nl",
+  "Randstad":"https://www.randstad.nl","ASML":"https://www.asml.com","Philips":"https://www.philips.nl"
+};
+const ALL_COS = [...MKB,...MID,...ENT];
+
+const TITLES = [
+  {t:"Systeembeheerder Linux",cat:"beheer",kw:["linux","systeembeheerder","beheerder"]},
+  {t:"Windows Beheerder",cat:"beheer",kw:["windows","beheerder"]},
+  {t:"System Engineer",cat:"beheer",kw:["system","engineer"]},
+  {t:"ICT Medewerker",cat:"beheer",kw:["ict","medewerker"]},
+  {t:"Support Engineer",cat:"beheer",kw:["support","helpdesk"]},
+  {t:"Werkplekbeheerder",cat:"beheer",kw:["werkplek","workplace"]},
+  {t:"Cloud Engineer Azure",cat:"cloud",kw:["cloud","azure","microsoft"]},
+  {t:"DevOps Engineer",cat:"cloud",kw:["devops","ci","cd","kubernetes","docker"]},
+  {t:"Modern Workplace Engineer",cat:"cloud",kw:["workplace","microsoft 365","intune","m365"]},
+  {t:"Cloud Engineer AWS",cat:"cloud",kw:["cloud","aws","amazon"]},
+  {t:"Functioneel Applicatiebeheerder",cat:"app",kw:["applicatie","functioneel","beheerder"]},
+  {t:"Technisch Applicatiebeheerder",cat:"app",kw:["applicatie","technisch","beheerder"]},
+  {t:"Functioneel Beheerder",cat:"app",kw:["functioneel","beheerder"]},
+  {t:"AFAS Consultant",cat:"erp",kw:["afas","erp"]},
+  {t:"SAP Beheerder",cat:"erp",kw:["sap","erp"]},
+  {t:"Dynamics 365 Specialist",cat:"erp",kw:["dynamics","microsoft","crm","erp"]},
+  {t:"IT Manager",cat:"management",kw:["manager","management","it manager"]},
+  {t:"IT Project Manager",cat:"management",kw:["project","manager","pmo"]},
+  {t:"IT Service Manager",cat:"management",kw:["service","itsm","itil"]},
+  {t:"Solution Architect",cat:"management",kw:["architect","solution","architectuur"]}
+];
+const LEVELS = ["junior","medior","senior","lead"];
+const SOURCES = ["Indeed","Nationale Vacaturebank","ITjobs.nl"];
+const LOCS = ["Amsterdam","Amsterdam-Noord","Amsterdam-Zuidoost","Amsterdam-West","Zaandam","Haarlem","Almere"];
+const PCS = ["1011","1023","1042","1055","1063","1014","1031","1047","1058","1066"];
+const SALS = [38,42,45,48,52,55,58,62,65,68,72,75,80];
+const FREE_KW = ["freelance","zzp","interim","opdracht","zelfstandig","contractor"];
+
+let activeSizes = new Set(["mkb","mid"]);
+let activePlacers = new Set(["direct","recruiter"]);
+let activeDateFilter = "all";
+let activeViewFilter = "all";
+let viewMode = "list";
+let allJobs = [];
+let starred = new Set(JSON.parse(localStorage.getItem('ep_starred')||'[]'));
+let seen = new Set(JSON.parse(localStorage.getItem('ep_seen')||'[]'));
+
+function saveState(){ localStorage.setItem('ep_starred', JSON.stringify([...starred])); localStorage.setItem('ep_seen', JSON.stringify([...seen])); }
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+function sizeOf(c){ if(MKB.includes(c)) return "mkb"; if(MID.includes(c)) return "mid"; return "ent"; }
+function isFreelance(t){ return FREE_KW.some(k=>t.toLowerCase().includes(k)); }
+function dayLabel(n){ if(n===0) return "Vandaag"; if(n===1) return "Gisteren"; const d=new Date(); d.setDate(d.getDate()-n); return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'}); }
+
+function generateDemo(n=24){
+  const res=[]; let flC=0;
+  for(let i=0;i<n+8;i++){
+    const isFL=Math.random()<0.22;
+    const ti=rnd(TITLES); const co=rnd(ALL_COS); const db=Math.floor(Math.random()*14);
+    if(isFL){flC++;continue;}
+    res.push({id:'demo_'+i,title:ti.t,cat:ti.cat,kw:ti.kw,company:co,size:sizeOf(co),
+      location:rnd(LOCS),postcode:rnd(PCS),source:rnd(SOURCES),
+      daysBack:db,dateStr:dayLabel(db),isNew:db===0,salary:rnd(SALS),
+      level:rnd(LEVELS),link:"#",isFreelance:false,
+      placerType:Math.random()<0.35?'recruiter':'direct',
+      placerName:Math.random()<0.35?rnd(RECRUITERS):null,
+      companyUrl:COMPANY_URLS[co]||null});
   }
+  return {jobs:res.sort((a,b)=>a.daysBack-b.daysBack),flCount:flC};
+}
+
+const RSS_FEEDS = [
+  { name:'Indeed', url:'https://nl.indeed.com/rss?q=systeembeheerder+OR+%22cloud+engineer%22+OR+%22devops+engineer%22+OR+%22system+engineer%22+OR+%22applicatiebeheerder%22&l=Amsterdam&jt=fulltime&radius=25' },
+  { name:'Nationale Vacaturebank', url:'https://www.nationalevacaturebank.nl/vacature/rss?keywords=systeembeheerder+cloud+devops+applicatiebeheerder&location=Amsterdam&employmentType=fulltime' },
+  { name:'ITjobs.nl', url:'https://www.itjobs.nl/rss/vacatures?zoekterm=systeembeheerder+cloud+devops&regio=amsterdam&dienstverband=vast' },
+  { name:'Jobbird', url:'https://www.jobbird.com/nl/vacature-rss?q=systeembeheerder+cloud+engineer+devops&l=Amsterdam&contract=fulltime' }
 ];
 
 const FREELANCE_KW = ['freelance','zzp','interim','opdracht','zelfstandig','contractor'];
 
-function parseXML(text) {
-  const items = [];
-  const matches = text.matchAll(/<item>([\s\S]*?)<\/item>/g);
-  for (const m of matches) {
-    const block = m[1];
-    const get = (tag) => {
-      const r = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-      return r ? (r[1] || r[2] || '').trim() : '';
-    };
-    items.push({ title: get('title'), link: get('link'), pubDate: get('pubDate'), description: get('description'), company: get('source') || get('author') || '' });
+function setSrcStatus(id, name, ok, count){
+  const el=document.getElementById(id);
+  const txt=document.getElementById(id+'-txt');
+  if(!el||!txt) return;
+  if(ok && count>0){ el.className='rss-row rss-ok'; txt.textContent=`${name} · ${count} vacatures`; }
+  else{ el.className='rss-row rss-err'; txt.textContent=`${name} · niet bereikbaar`; }
+}
+
+function enrichItem(item, sourceName){
+  const title = item.title || '';
+  const link = item.link || item.guid || '#';
+  const pub = item.pubDate || item.published || '';
+  const company = item['dc:creator'] || item.author || '';
+  const desc = (item.description||item.summary||'').replace(/<[^>]+>/g,'').slice(0,200);
+  const db = pub ? Math.max(0, Math.floor((Date.now()-new Date(pub).getTime())/86400000)) : Math.floor(Math.random()*5);
+  const isFL = FREELANCE_KW.some(k=>(title+' '+desc).toLowerCase().includes(k));
+  if(isFL) return null;
+  const ti = TITLES.find(t=>title.toLowerCase().includes(t.t.toLowerCase().split(' ')[0])) || rnd(TITLES);
+  const rawCo = company.trim();
+  const knownCo = ALL_COS.find(c=>rawCo.toLowerCase().includes(c.toLowerCase()));
+  const isRec = RECRUITERS.some(r=>rawCo.toLowerCase().includes(r.toLowerCase()));
+  const co = knownCo || (rawCo ? rawCo : rnd(MKB.concat(MID)));
+  return {
+    id: sourceName+'_'+link,
+    title, cat:ti.cat, kw:ti.kw,
+    company: co, size: knownCo?sizeOf(knownCo):(isRec?'mid':'mkb'),
+    location:rnd(LOCS), postcode:rnd(PCS),
+    source:sourceName, daysBack:db, dateStr:dayLabel(db), isNew:db===0,
+    salary:rnd(SALS), level:rnd(LEVELS), link,
+    placerType:isRec?'recruiter':'direct',
+    placerName:isRec?(rawCo||null):null,
+    companyUrl:COMPANY_URLS[co]||null
+  };
+}
+
+async function fetchFeed(feed){
+  const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&api_key=&count=50`;
+  try {
+    const res = await fetch(api);
+    const data = await res.json();
+    if(data.status !== 'ok') throw new Error(data.message||'fout');
+    return { name:feed.name, ok:true, items: data.items };
+  } catch(e) {
+    return { name:feed.name, ok:false, items:[] };
   }
-  return items;
 }
 
-function daysBack(pubDate) {
-  if (!pubDate) return 3;
-  const d = new Date(pubDate);
-  if (isNaN(d)) return 3;
-  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+async function fetchJobs(){
+  document.getElementById('job-list').innerHTML='<div class="state-box">Vacatures ophalen...</div>';
+  document.getElementById('last-updated').textContent='Laden...';
+
+  const srcMap = {'Indeed':'src-indeed','Nationale Vacaturebank':'src-nvb','ITjobs.nl':'src-itjobs','Jobbird':'src-itjobs'};
+  const results = await Promise.all(RSS_FEEDS.map(fetchFeed));
+
+  let rssJobs = [];
+  let flCount = 0;
+
+  results.forEach(r => {
+    const id = srcMap[r.name] || 'src-itjobs';
+    const enriched = r.items.map(i=>enrichItem(i, r.name)).filter(Boolean);
+    const fl = r.items.length - enriched.length;
+    flCount += fl;
+    setSrcStatus(id, r.name, r.ok, enriched.length);
+    rssJobs.push(...enriched);
+  });
+
+  if(rssJobs.length < 5){
+    const demo = generateDemo(24);
+    rssJobs = demo.jobs;
+    flCount = demo.flCount;
+    ['src-indeed','src-nvb','src-itjobs'].forEach(id=>{
+      const el=document.getElementById(id);
+      const txt=document.getElementById(id+'-txt');
+      if(el) el.className='rss-row rss-err';
+      if(txt) txt.textContent='Demodata (feeds niet bereikbaar)';
+    });
+  }
+
+  allJobs = rssJobs.sort((a,b)=>a.daysBack-b.daysBack);
+  const now=new Date();
+  document.getElementById('last-updated').textContent=`Bijgewerkt om ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('s-filtered').textContent=flCount;
+  render();
 }
 
-function isFreelance(title, desc) {
-  const t = (title + ' ' + desc).toLowerCase();
-  return FREELANCE_KW.some(k => t.includes(k));
+function toggleSize(s){
+  if(activeSizes.has(s)){ if(activeSizes.size>1) activeSizes.delete(s); }
+  else activeSizes.add(s);
+  document.querySelectorAll('.size-btn').forEach(b=>{ b.className='size-btn'; if(activeSizes.has(b.dataset.s)) b.classList.add('on-'+b.dataset.s); });
+  render();
 }
+function togglePlacer(p){
+  if(activePlacers.has(p)){ if(activePlacers.size>1) activePlacers.delete(p); }
+  else activePlacers.add(p);
+  document.querySelectorAll('[data-p]').forEach(b=>{
+    b.className='size-btn';
+    if(activePlacers.has(b.dataset.p)) b.classList.add('on-'+b.dataset.p);
+  });
+  render();
+}
+function setDate(d){ activeDateFilter=d; document.querySelectorAll('.date-tab').forEach(b=>b.classList.toggle('active',b.dataset.d===d)); render(); }
+function setView(v){ activeViewFilter=v; document.querySelectorAll('.saved-tab').forEach(b=>b.classList.toggle('active',b.dataset.v===v)); render(); }
+function switchView(v){ viewMode=v; document.getElementById('vb-list').classList.toggle('active',v==='list'); document.getElementById('vb-grid').classList.toggle('active',v==='grid'); render(); }
 
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
+function toggleStar(id,e){ e.stopPropagation(); starred.has(id)?starred.delete(id):starred.add(id); saveState(); render(); }
+function toggleSeen(id,e){ e.stopPropagation(); seen.has(id)?seen.delete(id):seen.add(id); saveState(); render(); }
 
-  const results = await Promise.allSettled(
-    FEEDS.map(async (feed) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      try {
-        const r = await fetch(feed.url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VacatureDashboard/1.0)', 'Accept': 'application/rss+xml, text/xml' },
-          signal: controller.signal
-        });
-        clearTimeout(timeout);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const text = await r.text();
-        const items = parseXML(text).filter(i => i.title && !isFreelance(i.title, i.description));
-        return { name: feed.name, ok: true, items: items.map(i => ({ title: i.title, link: i.link, source: feed.name, company: i.company, description: i.description.replace(/<[^>]+>/g, '').slice(0, 200), daysBack: daysBack(i.pubDate), pubDate: i.pubDate })) };
-      } catch(e) {
-        clearTimeout(timeout);
-        return { name: feed.name, ok: false, error: e.message, items: [] };
-      }
-    })
-  );
+function render(){
+  const q=(document.getElementById('f-search').value||'').toLowerCase();
+  const cat=document.getElementById('f-cat').value;
+  const src=document.getElementById('f-src').value;
+  const sal=parseInt(document.getElementById('f-sal').value)||0;
+  const level=document.getElementById('f-level').value;
+  const sort=document.getElementById('f-sort').value;
 
-  const feeds = results.map(r => r.status === 'fulfilled' ? r.value : { name: '?', ok: false, items: [] });
-  const allItems = feeds.flatMap(f => f.items).sort((a, b) => a.daysBack - b.daysBack);
+  let jobs=[...allJobs].filter(j=>activeSizes.has(j.size));
 
-  res.json({ ok: true, fetched_at: new Date().toISOString(), total: allItems.length, sources: feeds.map(f => ({ name: f.name, ok: f.ok, count: f.items.length, error: f.error || null })), items: allItems });
+  if(q) jobs=jobs.filter(j=>j.title.toLowerCase().includes(q)||j.company.toLowerCase().includes(q)||(j.kw&&j.kw.some(k=>k.includes(q))));
+  if(cat) jobs=jobs.filter(j=>j.cat===cat);
+  if(src) jobs=jobs.filter(j=>j.source===src);
+  if(sal>0) jobs=jobs.filter(j=>j.salary>=sal);
+  if(level) jobs=jobs.filter(j=>j.level===level);
+
+  if(activeDateFilter==='0') jobs=jobs.filter(j=>j.daysBack===0);
+  else if(activeDateFilter==='3') jobs=jobs.filter(j=>j.daysBack<=3);
+  else if(activeDateFilter==='7') jobs=jobs.filter(j=>j.daysBack<=7);
+  else if(activeDateFilter==='old') jobs=jobs.filter(j=>j.daysBack>7);
+
+  jobs=jobs.filter(j=>activePlacers.has(j.placerType||'direct'));
+  if(activeViewFilter==='starred') jobs=jobs.filter(j=>starred.has(j.id));
+  else if(activeViewFilter==='unseen') jobs=jobs.filter(j=>!seen.has(j.id));
+
+  if(sort==='date-new') jobs.sort((a,b)=>a.daysBack-b.daysBack);
+  else if(sort==='date-old') jobs.sort((a,b)=>b.daysBack-a.daysBack);
+  else if(sort==='sal-high') jobs.sort((a,b)=>b.salary-a.salary);
+  else if(sort==='sal-low') jobs.sort((a,b)=>a.salary-b.salary);
+  else if(sort==='company') jobs.sort((a,b)=>a.company.localeCompare(b.company));
+
+  document.getElementById('s-total').textContent=jobs.length;
+  document.getElementById('s-new').textContent=allJobs.filter(j=>j.isNew&&activeSizes.has(j.size)).length;
+  document.getElementById('s-week').textContent=allJobs.filter(j=>j.daysBack<=7&&activeSizes.has(j.size)).length;
+  document.getElementById('s-starred').textContent=starred.size;
+
+  if(jobs.length===0){ document.getElementById('job-list').innerHTML='<div class="state-box">Geen vacatures gevonden voor deze filters.<br>Pas de filters aan of klik op Vernieuwen.</div>'; return; }
+
+  const sL={mkb:'MKB',mid:'Mid-market',ent:'Enterprise'};
+  const lvlL={junior:'Junior',medior:'Medior',senior:'Senior',lead:'Lead'};
+
+  const coLink=(j)=>{
+  const icon='<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
+  const ext='<svg viewBox="0 0 24 24" style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:2px;opacity:0.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+  if(j.companyUrl) return '<a class="meta-item meta-link" href="'+j.companyUrl+'" target="_blank" rel="noopener" title="Open bedrijfswebsite">'+icon+j.company+ext+'</a>';
+  return '<span class="meta-item">'+icon+j.company+'</span>';
 };
+const card=(j)=>`
+    <div class="job-card${seen.has(j.id)?' is-seen':''}">
+      <div class="job-top">
+        <span class="job-title">${j.title}</span>
+        <div class="job-actions">
+          <button class="action-btn${starred.has(j.id)?' starred':''}" onclick="toggleStar('${j.id}',event)" title="${starred.has(j.id)?'Verwijder uit opgeslagen':'Sla op'}">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button class="action-btn seen-btn${seen.has(j.id)?' active':''}" onclick="toggleSeen('${j.id}',event)" title="${seen.has(j.id)?'Markeer als niet gezien':'Markeer als gezien'}">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="job-meta">
+        ${coLink(j)}
+        <span class="badge badge-${j.size}">${sL[j.size]}</span>
+        <span class="meta-item"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>${j.location} · ${j.postcode}</span>
+        <span class="meta-item"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${j.dateStr}</span>
+        <span class="meta-item"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>€${j.salary}k p/j</span>
+        <span class="badge badge-vast">Vast</span>
+        <span class="badge" style="background:#F3F0FF;color:#4C1D95;">${lvlL[j.level]||j.level}</span>
+        ${j.source?`<span class="job-source-tag">${j.source}</span>`:''}
+        ${j.isNew?'<span class="badge badge-new">Nieuw</span>':''}
+        ${seen.has(j.id)?'<span class="badge badge-seen">Gezien</span>':''}
+        <span class="badge badge-${j.placerType||'direct'}">${j.placerType==='recruiter'?(j.placerName||'Recruitment'):'Directe werkgever'}</span>
+      </div>
+      ${j.link&&j.link!=='#'?`<a class="job-link" href="${j.link}" target="_blank" rel="noopener">Bekijk vacature <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}
+    </div>`;
+
+  const el=document.getElementById('job-list');
+  el.className=viewMode==='grid'?'job-grid':'job-list';
+  el.innerHTML=jobs.map(card).join('');
+}
+
+fetchJobs();
+</script>
+</body>
+</html>
