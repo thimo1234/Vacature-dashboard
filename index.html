@@ -680,7 +680,9 @@ MATCH 2
 Schrijf in het Nederlands.`;
 
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
+    const apiKey = localStorage.getItem('ep_api_key')||'';
+    if(!apiKey){document.getElementById('m-result').innerHTML='<div style="color:var(--red);font-size:13px;">Voer eerst je Anthropic API key in bovenaan de pagina.</div>';btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg> Beste kandidaten zoeken';return;}
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content?.[0]?.text||'';
     matchCount++;saveMatchCount();updateStats();
@@ -752,7 +754,31 @@ function exportExcel(){
   XLSX.writeFile(wb, `Hotlist_Elevation_Partners_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+function saveApiKey(){
+  const key = document.getElementById('api-key-input').value.trim();
+  if(!key||!key.startsWith('sk-ant-')){
+    document.getElementById('api-status').textContent='Ongeldige key — moet beginnen met sk-ant-';
+    return;
+  }
+  localStorage.setItem('ep_api_key', key);
+  document.getElementById('api-key-input').value='';
+  document.getElementById('api-status').textContent='✓ Opgeslagen!';
+  document.getElementById('api-banner').style.background='var(--green-bg)';
+  document.getElementById('api-banner').style.borderColor='var(--green-border)';
+  setTimeout(()=>{
+    document.getElementById('api-banner').style.display='none';
+  }, 2000);
+}
+
+function loadApiKey(){
+  const key = localStorage.getItem('ep_api_key');
+  if(key){
+    document.getElementById('api-banner').style.display='none';
+  }
+}
+
 init();
+loadApiKey();
 </script>
 </body>
 </html>
